@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import { validateSignUpForm, validateSigninForm } from '../utils/validate';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../utils/firebase';
 
 const Login = () => {
   const [isSignIn, setIsSignIn] = useState(true);
@@ -9,13 +11,29 @@ const Login = () => {
   const passwordRef = useRef(null);
   const confirmPasswordRef = useRef(null);
 
-  const toggleSignInForm = () => setIsSignIn(!isSignIn);
+  const toggleSignInForm = () => {
+    setError(undefined);
+    setIsSignIn(!isSignIn)
+  };
 
   const handleAuthentication = () => {
     setError(undefined);
     if (isSignIn) {
       const signInFormError = validateSigninForm(emailRef.current.value, passwordRef.current.value);
-      signInFormError ? setError(signInFormError) : console.log('valid form');
+      signInFormError ?
+        setError(signInFormError) :
+        signInWithEmailAndPassword(auth, emailRef.current.value, passwordRef.current.value)
+          .then((userCredential) => {
+            // Signed in 
+            const user = userCredential.user;
+            console.log({user});
+            // ...
+          })
+          .catch((error) => {
+            const errorCode = error.code;
+            const errorMessage = error.message;
+            setError(errorCode + "-" + errorMessage);
+          });;
       return;
     }
     const signUpFormError = validateSignUpForm(
@@ -24,7 +42,23 @@ const Login = () => {
       passwordRef.current.value,
       confirmPasswordRef.current.value
     );
-    signUpFormError ? setError(signUpFormError) : console.log("valid sign up form");
+    signUpFormError ?
+      setError(signUpFormError) :
+      createUserWithEmailAndPassword(auth, emailRef.current.value, passwordRef.current.value)
+        .then((userCredential) => {
+          // Signed up 
+          const user = userCredential.user;
+          console.log({ user })
+          // ...
+        })
+        .catch((error) => {
+          console.log({ error })
+
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setError(errorCode + "-" + errorMessage);
+          // ..
+        });
   };
 
   return (
@@ -67,7 +101,7 @@ const Login = () => {
           {error && <span className="text-sm text-red-600">{error}</span>}
 
           <button className="p-2 bg-red-600 text-white" onClick={handleAuthentication}>
-            {isSignIn ? 'Sign In' : ' Sign In'}
+            {isSignIn ? 'Sign In' : ' Sign Up'}
           </button>
         </form>
         <h3 className="text-white font-thin">
