@@ -1,9 +1,14 @@
 import { useRef, useState } from 'react';
 import { validateSignUpForm, validateSigninForm } from '../utils/validate';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../utils/firebase';
+import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { addUser } from '../utils/userSlice';
 
 const Login = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [isSignIn, setIsSignIn] = useState(true);
   const [error, setError] = useState();
   const nameRef = useRef(null);
@@ -13,27 +18,28 @@ const Login = () => {
 
   const toggleSignInForm = () => {
     setError(undefined);
-    setIsSignIn(!isSignIn)
+    setIsSignIn(!isSignIn);
   };
 
   const handleAuthentication = () => {
     setError(undefined);
     if (isSignIn) {
       const signInFormError = validateSigninForm(emailRef.current.value, passwordRef.current.value);
-      signInFormError ?
-        setError(signInFormError) :
-        signInWithEmailAndPassword(auth, emailRef.current.value, passwordRef.current.value)
-          .then((userCredential) => {
-            // Signed in 
-            const user = userCredential.user;
-            console.log({user});
-            // ...
-          })
-          .catch((error) => {
-            const errorCode = error.code;
-            const errorMessage = error.message;
-            setError(errorCode + "-" + errorMessage);
-          });;
+      signInFormError
+        ? setError(signInFormError)
+        : signInWithEmailAndPassword(auth, emailRef.current.value, passwordRef.current.value)
+            .then((userCredential) => {
+              // Signed in
+              const user = userCredential.user;
+              console.log({ user });
+              navigate('/browse');
+
+            })
+            .catch((error) => {
+              const errorCode = error.code;
+              const errorMessage = error.message;
+              setError(errorCode + '-' + errorMessage);
+            });
       return;
     }
     const signUpFormError = validateSignUpForm(
@@ -42,23 +48,37 @@ const Login = () => {
       passwordRef.current.value,
       confirmPasswordRef.current.value
     );
-    signUpFormError ?
-      setError(signUpFormError) :
-      createUserWithEmailAndPassword(auth, emailRef.current.value, passwordRef.current.value)
-        .then((userCredential) => {
-          // Signed up 
-          const user = userCredential.user;
-          console.log({ user })
-          // ...
-        })
-        .catch((error) => {
-          console.log({ error })
+    signUpFormError
+      ? setError(signUpFormError)
+      : createUserWithEmailAndPassword(auth, emailRef.current.value, passwordRef.current.value)
+          .then((userCredential) => {
+            // Signed up
+            const user = userCredential.user;
+            updateProfile(user, {
+              displayName: nameRef.current.value,
+            })
+              .then(() => {
+                const { uid, email, displayName } = auth.currentUser;
+                dispatch(
+                  addUser({
+                    uid,
+                    email,
+                    displayName,
+                  })
+                );
+                navigate('/browse');
+              })
+              .catch((error) => {
+                console.log('failed to update user profile');
+              });
+          })
+          .catch((error) => {
+            console.log({ error });
 
-          const errorCode = error.code;
-          const errorMessage = error.message;
-          setError(errorCode + "-" + errorMessage);
-          // ..
-        });
+            const errorCode = error.code;
+            const errorMessage = error.message;
+            setError(errorCode + '-' + errorMessage);
+          });
   };
 
   return (
